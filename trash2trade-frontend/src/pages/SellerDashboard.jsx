@@ -25,7 +25,7 @@ function StatCard({ title, value, color }) {
   );
 }
 
-const COLORS = ["#22c55e", "#ef4444", "#f59e0b", "#3b82f6"];
+const COLORS = ["#22c55e", "#ef4444", "#3b82f6", "#f59e0b"];
 
 export default function SellerDashboard() {
   const [orders, setOrders] = useState([]);
@@ -37,7 +37,6 @@ export default function SellerDashboard() {
       axios.get("/orders/my-sells"),
       axios.get("/stats/seller"),
     ]);
-
     setOrders(ordersRes.data);
     setStats(statsRes.data);
   };
@@ -46,19 +45,36 @@ export default function SellerDashboard() {
     loadData();
   }, []);
 
-  const updateStatus = async (id, status) => {
+  /* -------------------------------
+     ACTIONS
+  -------------------------------- */
+  const approveReject = async (id, action) => {
     try {
       setLoading(true);
-      await axios.put(`/orders/${id}/status`, { status });
+      await axios.put(`/orders/${id}/approve`, { action });
       loadData();
-    } catch (e) {
-      alert(e.response?.data?.message || "Failed to update");
+    } catch {
+      alert("Action failed");
     } finally {
       setLoading(false);
     }
   };
 
-  // 📊 CHART DATA
+  const markShipped = async (id) => {
+    try {
+      setLoading(true);
+      await axios.put(`/orders/${id}/pickup`);
+      loadData();
+    } catch {
+      alert("Shipment failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* -------------------------------
+     CHART DATA
+  -------------------------------- */
   const barData = stats
     ? [
         { name: "Approved", value: stats.approved },
@@ -85,32 +101,24 @@ export default function SellerDashboard() {
         </div>
       )}
 
-      {/* 📊 CHARTS */}
+      {/* CHARTS */}
       {stats && (
         <div className="grid md:grid-cols-2 gap-6 mb-10">
           <div className="bg-gray-800 p-4 rounded h-72">
-            <p className="font-semibold mb-2">Orders Status (Bar Chart)</p>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData}>
                 <XAxis dataKey="name" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="value" fill="#22c55e" />
+                <Bar dataKey="value" fill="#3b82f6" />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="bg-gray-800 p-4 rounded h-72">
-            <p className="font-semibold mb-2">Orders Distribution (Pie Chart)</p>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  outerRadius={90}
-                  label
-                >
+                <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={90} label>
                   {pieData.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
@@ -124,92 +132,65 @@ export default function SellerDashboard() {
       )}
 
       {/* ORDERS */}
-      {orders.length === 0 ? (
-        <p>No orders yet</p>
-      ) : (
-        orders.map((order) => (
-          <div
-            key={order._id}
-            className={`p-5 rounded mb-4 shadow
-              ${
-                order.status === "Completed"
-                  ? "bg-emerald-900 border border-emerald-500"
-                  : order.status === "Rejected"
-                  ? "bg-red-900/40 border border-red-500"
-                  : "bg-gray-800"
-              }`}
-          >
+      {orders.map((order) => {
+        const statusClass =
+          order.orderStatus === "COMPLETED"
+            ? "bg-emerald-900/40 border border-emerald-500 animate-pulse"
+            : order.orderStatus === "CANCELLED"
+            ? "bg-red-900/40 border border-red-500 animate-pulse"
+            : "bg-gray-800";
+
+        return (
+          <div key={order._id} className={`p-5 rounded mb-4 shadow ${statusClass}`}>
             <p><b>Material:</b> {order.material?.name}</p>
             <p><b>Quantity:</b> {order.quantity}</p>
             <p>
               <b>Status:</b>{" "}
-              <span
-                className={`font-semibold ${
-                  order.status === "Completed"
-                    ? "text-emerald-400"
-                    : order.status === "Rejected"
-                    ? "text-red-400"
-                    : "text-yellow-400"
-                }`}
-              >
-                {order.status}
+              <span className="font-semibold text-yellow-300">
+                {order.orderStatus}
               </span>
             </p>
-            <p className="text-sm text-gray-300">
-              Buyer: {order.buyer?.companyName}
+            <p>
+              <b>Payment:</b>{" "}
+              <span className={order.paymentStatus === "PAID" ? "text-green-400" : "text-yellow-400"}>
+                {order.paymentStatus}
+              </span>
             </p>
 
-            {/* ACTION BUTTONS */}
+            {/* ACTIONS */}
             <div className="mt-4 flex gap-3">
-              {order.status === "Placed" && (
+              {order.orderStatus === "PLACED" && (
                 <>
-                  <button
-                    disabled={loading}
-                    onClick={() => updateStatus(order._id, "Approved")}
-                    className="bg-green-600 px-4 py-2 rounded hover:bg-green-700"
-                  >
+                  <button onClick={() => approveReject(order._id, "APPROVE")} className="bg-green-600 px-4 py-2 rounded">
                     Approve
                   </button>
-                  <button
-                    disabled={loading}
-                    onClick={() => updateStatus(order._id, "Rejected")}
-                    className="bg-red-600 px-4 py-2 rounded hover:bg-red-700"
-                  >
+                  <button onClick={() => approveReject(order._id, "REJECT")} className="bg-red-600 px-4 py-2 rounded">
                     Reject
                   </button>
                 </>
               )}
 
-              {order.status === "Approved" && (
-                <button
-                  disabled={loading}
-                  onClick={() => updateStatus(order._id, "Shipped")}
-                  className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
-                >
+              {order.orderStatus === "APPROVED" && order.paymentStatus === "PAID" && (
+                <button onClick={() => markShipped(order._id)} className="bg-blue-600 px-4 py-2 rounded">
                   Mark Shipped
                 </button>
               )}
             </div>
 
-            {/* COMPLETED STATE */}
-            {order.status === "Completed" && (
-              <div className="mt-4 flex items-center gap-3 text-emerald-300">
-                <span className="text-2xl">✔</span>
-                <span className="font-semibold text-lg">
-                  Order Completed Successfully
-                </span>
+            {order.orderStatus === "COMPLETED" && (
+              <div className="mt-4 text-emerald-300 font-bold text-lg">
+                ✔ Order Completed Successfully
               </div>
             )}
 
-            {/* REJECTED STATE */}
-            {order.status === "Rejected" && (
-              <div className="mt-4 text-red-300 font-semibold">
+            {order.orderStatus === "CANCELLED" && (
+              <div className="mt-4 text-red-300 font-bold text-lg">
                 ❌ Order Rejected
               </div>
             )}
           </div>
-        ))
-      )}
+        );
+      })}
     </div>
   );
 }

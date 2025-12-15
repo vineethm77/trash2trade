@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "../api";
+import PayButton from "../components/PayButton";
 import {
   BarChart,
   Bar,
@@ -13,25 +14,25 @@ import {
   Legend,
 } from "recharts";
 
-const steps = ["Placed", "Approved", "Shipped", "Completed"];
+const steps = ["PLACED", "APPROVED", "PICKED_UP", "COMPLETED"];
 const COLORS = ["#22c55e", "#ef4444", "#f59e0b", "#3b82f6"];
 
 /* -------------------------------
-   TIMELINE COMPONENT
+   TIMELINE
 -------------------------------- */
 function Timeline({ status }) {
-  if (status === "Rejected") {
-    return <div className="mt-3 text-red-400 font-semibold">❌ Rejected</div>;
+  if (status === "CANCELLED") {
+    return <div className="mt-3 text-red-400 font-semibold">❌ Cancelled</div>;
   }
 
   return (
-    <div className="flex gap-3 mt-3">
+    <div className="flex gap-2 mt-3 flex-wrap">
       {steps.map((step) => {
         const active = steps.indexOf(step) <= steps.indexOf(status);
         return (
           <div
             key={step}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1 rounded text-xs ${
               active ? "bg-green-600" : "bg-gray-700"
             }`}
           >
@@ -79,7 +80,7 @@ export default function BuyerDashboard() {
   const confirmDelivery = async (id) => {
     try {
       setLoading(true);
-      await axios.put(`/orders/${id}/confirm`);
+      await axios.put(`/orders/${id}/complete`);
       loadData();
     } catch (e) {
       alert(e.response?.data?.message || "Confirmation failed");
@@ -115,11 +116,10 @@ export default function BuyerDashboard() {
         </div>
       )}
 
-      {/* 📊 CHARTS */}
+      {/* CHARTS */}
       {stats && (
         <div className="grid md:grid-cols-2 gap-6 mb-10">
           <div className="bg-gray-800 p-4 rounded h-72">
-            <p className="font-semibold mb-2">My Orders (Bar Chart)</p>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData}>
                 <XAxis dataKey="name" />
@@ -131,16 +131,9 @@ export default function BuyerDashboard() {
           </div>
 
           <div className="bg-gray-800 p-4 rounded h-72">
-            <p className="font-semibold mb-2">Orders Distribution (Pie Chart)</p>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  outerRadius={90}
-                  label
-                >
+                <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={90} label>
                   {pieData.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
@@ -154,18 +147,49 @@ export default function BuyerDashboard() {
       )}
 
       {/* ORDERS */}
-      {orders.length === 0 ? (
-        <p>No purchases yet</p>
-      ) : (
-        orders.map((order) => (
-          <div key={order._id} className="bg-gray-800 p-4 rounded mb-4">
+      {orders.map((order) => {
+        const statusStyle =
+          order.orderStatus === "COMPLETED"
+            ? "bg-emerald-900/40 border border-emerald-500 animate-pulse"
+            : order.orderStatus === "CANCELLED"
+            ? "bg-red-900/40 border border-red-500 animate-pulse"
+            : "bg-gray-800";
+
+        return (
+          <div key={order._id} className={`p-4 rounded mb-4 ${statusStyle}`}>
             <p><b>Material:</b> {order.material?.name}</p>
             <p><b>Quantity:</b> {order.quantity}</p>
-            <p><b>Status:</b> {order.status}</p>
+            <p>
+              <b>Status:</b>{" "}
+              <span className="font-semibold text-yellow-300">
+                {order.orderStatus}
+              </span>
+            </p>
+            <p>
+              <b>Payment:</b>{" "}
+              <span
+                className={
+                  order.paymentStatus === "PAID"
+                    ? "text-green-400 font-semibold"
+                    : "text-yellow-400 font-semibold"
+                }
+              >
+                {order.paymentStatus}
+              </span>
+            </p>
 
-            <Timeline status={order.status} />
+            <Timeline status={order.orderStatus} />
 
-            {order.status === "Shipped" && (
+            {/* PAY */}
+            {order.orderStatus === "APPROVED" &&
+              order.paymentStatus === "PENDING" && (
+                <div className="mt-4">
+                  <PayButton orderId={order._id} />
+                </div>
+              )}
+
+            {/* CONFIRM DELIVERY */}
+            {order.orderStatus === "PICKED_UP" && (
               <button
                 disabled={loading}
                 onClick={() => confirmDelivery(order._id)}
@@ -174,9 +198,21 @@ export default function BuyerDashboard() {
                 Confirm Delivery
               </button>
             )}
+
+            {order.orderStatus === "COMPLETED" && (
+              <div className="mt-4 text-emerald-300 font-bold text-lg">
+                ✔ Order Completed Successfully
+              </div>
+            )}
+
+            {order.orderStatus === "CANCELLED" && (
+              <div className="mt-4 text-red-300 font-bold text-lg">
+                ❌ Order Cancelled
+              </div>
+            )}
           </div>
-        ))
-      )}
+        );
+      })}
     </div>
   );
 }

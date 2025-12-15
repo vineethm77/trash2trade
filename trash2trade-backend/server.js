@@ -8,7 +8,8 @@ import sendEmail from "./utils/sendEmail.js";
 import authRoutes from "./routes/authRoutes.js";
 import materialRoutes from "./routes/materialRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
-import statsRoutes from "./routes/statsRoutes.js"; // ✅ ADD THIS
+import paymentRoutes from "./routes/paymentRoutes.js"; // ✅ RAZORPAY
+import statsRoutes from "./routes/statsRoutes.js";
 
 dotenv.config();
 
@@ -34,7 +35,8 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/materials", materialRoutes);
 app.use("/api/orders", orderRoutes);
-app.use("/api/stats", statsRoutes); // ✅ ADD THIS
+app.use("/api/payments", paymentRoutes); // ✅ PAYMENT ROUTES
+app.use("/api/stats", statsRoutes);
 
 // --------------------
 // SMTP TEST ROUTE

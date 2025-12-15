@@ -13,18 +13,19 @@ import {
 
 const router = express.Router();
 
-/* -------------------------------
-   CREATE ORDER
--------------------------------- */
+/* ===============================
+   CREATE ORDER (BUYER → PLACED)
+================================ */
 router.post("/", protect, async (req, res) => {
   try {
     const { materialId, quantity, logisticsMode } = req.body;
 
-    const material = await Material.findById(materialId)
-      .populate("seller")
-      .populate("seller");
+    if (!materialId || !quantity) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
 
-    if (!material || material.isActive === false) {
+    const material = await Material.findById(materialId).populate("seller");
+    if (!material || material.status !== "active") {
       return res.status(404).json({ message: "Material not available" });
     }
 
@@ -37,20 +38,19 @@ router.post("/", protect, async (req, res) => {
       seller: material.seller._id,
       material: material._id,
       quantity,
-      logisticsMode,
-      status: "Placed",
+      logisticsMode: logisticsMode || "direct",
+      orderStatus: "PLACED",
+      paymentStatus: "PENDING",
     });
 
     material.quantity -= quantity;
-    if (material.quantity === 0) material.isActive = false;
+    if (material.quantity === 0) material.status = "inactive";
     await material.save();
 
-    // 📧 EMAILS
-    console.log("📨 Sending ORDER PLACED emails");
     await sendEmail(
       material.seller.email,
       "New Order Received",
-      orderPlacedEmail("Seller", material.name)
+      orderPlacedEmail(material.seller.name, material.name)
     );
 
     res.status(201).json(order);
@@ -60,33 +60,29 @@ router.post("/", protect, async (req, res) => {
   }
 });
 
-/* -------------------------------
-   SELLER UPDATE STATUS
--------------------------------- */
-router.put("/:id/status", protect, async (req, res) => {
+/* ===============================
+   SELLER APPROVE / REJECT
+================================ */
+router.put("/:id/approve", protect, async (req, res) => {
   try {
-    const { status } = req.body;
-
-    const allowed = ["Approved", "Rejected", "Shipped"];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
-    }
+    const { action } = req.body;
 
     const order = await Order.findById(req.params.id)
       .populate("buyer")
       .populate("material");
 
     if (!order) return res.status(404).json({ message: "Order not found" });
-
-    if (order.seller.toString() !== req.user._id.toString()) {
+    if (order.seller.toString() !== req.user._id.toString())
       return res.status(403).json({ message: "Not authorized" });
+
+    if (order.orderStatus !== "PLACED") {
+      return res.status(400).json({ message: "Order not in PLACED state" });
     }
 
-    order.status = status;
-    await order.save();
+    if (action === "APPROVE") {
+      order.orderStatus = "APPROVED";
+      order.approvedAt = new Date();
 
-    // 📧 EMAILS
-    if (status === "Approved") {
       await sendEmail(
         order.buyer.email,
         "Order Approved",
@@ -94,7 +90,9 @@ router.put("/:id/status", protect, async (req, res) => {
       );
     }
 
-    if (status === "Rejected") {
+    if (action === "REJECT") {
+      order.orderStatus = "CANCELLED";
+
       await sendEmail(
         order.buyer.email,
         "Order Rejected",
@@ -102,40 +100,68 @@ router.put("/:id/status", protect, async (req, res) => {
       );
     }
 
-    if (status === "Shipped") {
-      await sendEmail(
-        order.buyer.email,
-        "Order Shipped",
-        orderShippedEmail(order.material.name)
-      );
-    }
-
+    await order.save();
     res.json(order);
   } catch (err) {
-    console.error("STATUS UPDATE ERROR:", err);
-    res.status(500).json({ message: "Status update failed" });
+    console.error("APPROVAL ERROR:", err);
+    res.status(500).json({ message: "Approval failed" });
   }
 });
 
-/* -------------------------------
+/* ===============================
+   SELLER SHIP (ONLY AFTER PAYMENT)
+================================ */
+router.put("/:id/pickup", protect, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("buyer")
+      .populate("material");
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.seller.toString() !== req.user._id.toString())
+      return res.status(403).json({ message: "Not authorized" });
+
+    if (order.paymentStatus !== "PAID") {
+      return res.status(400).json({ message: "Payment not completed yet" });
+    }
+
+    order.orderStatus = "PICKED_UP";
+    await order.save();
+
+    await sendEmail(
+      order.buyer.email,
+      "Order Shipped",
+      orderShippedEmail(order.material.name)
+    );
+
+    res.json(order);
+  } catch (err) {
+    console.error("PICKUP ERROR:", err);
+    res.status(500).json({ message: "Pickup update failed" });
+  }
+});
+
+/* ===============================
    BUYER CONFIRM DELIVERY
--------------------------------- */
-router.put("/:id/confirm", protect, async (req, res) => {
+================================ */
+router.put("/:id/complete", protect, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("seller")
       .populate("material");
 
     if (!order) return res.status(404).json({ message: "Order not found" });
-
-    if (order.buyer.toString() !== req.user._id.toString()) {
+    if (order.buyer.toString() !== req.user._id.toString())
       return res.status(403).json({ message: "Not authorized" });
+
+    if (order.orderStatus !== "PICKED_UP") {
+      return res.status(400).json({ message: "Order not shipped yet" });
     }
 
-    order.status = "Completed";
+    order.orderStatus = "COMPLETED";
+    order.completedAt = new Date();
     await order.save();
 
-    // 📧 EMAIL
     await sendEmail(
       order.seller.email,
       "Order Completed",
@@ -144,14 +170,14 @@ router.put("/:id/confirm", protect, async (req, res) => {
 
     res.json(order);
   } catch (err) {
-    console.error("CONFIRM DELIVERY ERROR:", err);
-    res.status(500).json({ message: "Confirmation failed" });
+    console.error("COMPLETE ERROR:", err);
+    res.status(500).json({ message: "Completion failed" });
   }
 });
 
-/* -------------------------------
+/* ===============================
    GET SELLER ORDERS
--------------------------------- */
+================================ */
 router.get("/my-sells", protect, async (req, res) => {
   const orders = await Order.find({ seller: req.user._id })
     .populate("material")
@@ -159,9 +185,9 @@ router.get("/my-sells", protect, async (req, res) => {
   res.json(orders);
 });
 
-/* -------------------------------
+/* ===============================
    GET BUYER ORDERS
--------------------------------- */
+================================ */
 router.get("/my-buys", protect, async (req, res) => {
   const orders = await Order.find({ buyer: req.user._id })
     .populate("material")

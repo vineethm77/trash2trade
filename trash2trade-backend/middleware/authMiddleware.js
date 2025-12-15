@@ -1,11 +1,10 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-// This IS the protect middleware
+// Protect routes (JWT)
 export const protect = async (req, res, next) => {
   let token;
 
-  // Read token from headers
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
@@ -13,19 +12,30 @@ export const protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(" ")[1];
 
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Attach user to req
-      req.user = { _id: decoded.id };
+      // 🔥 Fetch full user (role needed)
+      const user = await User.findById(decoded.id).select("-password");
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
 
-      return next();
-
+      req.user = user;
+      next();
     } catch (error) {
       return res.status(401).json({ message: "Token invalid" });
     }
+  } else {
+    return res.status(401).json({ message: "No token provided" });
   }
+};
 
-  // No token found
-  return res.status(401).json({ message: "No token provided" });
+// 🔥 Role-based access
+export const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    next();
+  };
 };

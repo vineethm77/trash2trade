@@ -17,27 +17,50 @@ const orderSchema = new mongoose.Schema(
       ref: "Material",
       required: true,
     },
+
+    // Order details
     quantity: {
       type: Number,
       required: true,
     },
+
     logisticsMode: {
       type: String,
       enum: ["direct", "3pl", "hub"],
       default: "direct",
     },
-    status: {
+
+    // 🔥 ORDER LIFECYCLE
+    orderStatus: {
       type: String,
       enum: [
-        "Placed",
-        "Approved",
-        "Rejected",
-        "Shipped",
-        "Completed",
-        "Cancelled",
+        "PLACED",
+        "PAID",
+        "APPROVED",
+        "PICKED_UP",
+        "COMPLETED",
+        "CANCELLED",
       ],
-      default: "Placed",
+      default: "PLACED",
     },
+
+    // 🔥 PAYMENT STATUS
+    paymentStatus: {
+      type: String,
+      enum: ["PENDING", "PAID", "FAILED"],
+      default: "PENDING",
+    },
+
+    // 🔥 RAZORPAY DETAILS
+    paymentInfo: {
+      razorpayOrderId: String,
+      razorpayPaymentId: String,
+      razorpaySignature: String,
+    },
+
+    // Timestamps for workflow
+    approvedAt: Date,
+    completedAt: Date,
   },
   { timestamps: true }
 );
