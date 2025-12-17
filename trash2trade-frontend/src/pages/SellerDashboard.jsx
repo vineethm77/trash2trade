@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import axios from "../api";
 import {
   BarChart,
@@ -13,15 +14,18 @@ import {
   Legend,
 } from "recharts";
 
-/* -------------------------------
-   STAT CARD
--------------------------------- */
+/* ---------------- STAT CARD ---------------- */
 function StatCard({ title, value, color }) {
   return (
-    <div className={`bg-gray-800 border ${color} p-4 rounded`}>
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.05 }}
+      className={`bg-gray-800 border ${color} p-4 rounded-xl shadow`}
+    >
       <p className="text-sm text-gray-400">{title}</p>
       <p className="text-2xl font-bold">{value}</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -45,9 +49,7 @@ export default function SellerDashboard() {
     loadData();
   }, []);
 
-  /* -------------------------------
-     ACTIONS
-  -------------------------------- */
+  /* ---------------- ACTIONS ---------------- */
   const approveReject = async (id, action) => {
     try {
       setLoading(true);
@@ -72,9 +74,7 @@ export default function SellerDashboard() {
     }
   };
 
-  /* -------------------------------
-     CHART DATA
-  -------------------------------- */
+  /* ---------------- CHART DATA ---------------- */
   const barData = stats
     ? [
         { name: "Approved", value: stats.approved },
@@ -88,11 +88,17 @@ export default function SellerDashboard() {
 
   return (
     <div className="p-8 text-white">
-      <h1 className="text-3xl font-bold mb-6">Seller Dashboard</h1>
+      <motion.h1
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-3xl font-bold mb-8"
+      >
+        Seller Dashboard
+      </motion.h1>
 
       {/* STATS */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
           <StatCard title="Total Orders" value={stats.total} color="border-blue-500" />
           <StatCard title="Approved" value={stats.approved} color="border-green-500" />
           <StatCard title="Rejected" value={stats.rejected} color="border-red-500" />
@@ -103,8 +109,12 @@ export default function SellerDashboard() {
 
       {/* CHARTS */}
       {stats && (
-        <div className="grid md:grid-cols-2 gap-6 mb-10">
-          <div className="bg-gray-800 p-4 rounded h-72">
+        <div className="grid md:grid-cols-2 gap-6 mb-12">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-gray-800 p-4 rounded-xl h-72 shadow"
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData}>
                 <XAxis dataKey="name" />
@@ -113,9 +123,13 @@ export default function SellerDashboard() {
                 <Bar dataKey="value" fill="#3b82f6" />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </motion.div>
 
-          <div className="bg-gray-800 p-4 rounded h-72">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-gray-800 p-4 rounded-xl h-72 shadow"
+          >
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={90} label>
@@ -127,32 +141,47 @@ export default function SellerDashboard() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </motion.div>
         </div>
       )}
 
       {/* ORDERS */}
-      {orders.map((order) => {
+      {orders.map((order, i) => {
         const statusClass =
           order.orderStatus === "COMPLETED"
-            ? "bg-emerald-900/40 border border-emerald-500 animate-pulse"
+            ? "bg-emerald-900/30 border border-emerald-500"
             : order.orderStatus === "CANCELLED"
-            ? "bg-red-900/40 border border-red-500 animate-pulse"
+            ? "bg-red-900/30 border border-red-500"
             : "bg-gray-800";
 
         return (
-          <div key={order._id} className={`p-5 rounded mb-4 shadow ${statusClass}`}>
+          <motion.div
+            key={order._id}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            whileHover={{ scale: 1.02 }}
+            className={`p-5 rounded-xl mb-4 shadow ${statusClass}`}
+          >
             <p><b>Material:</b> {order.material?.name}</p>
             <p><b>Quantity:</b> {order.quantity}</p>
+
             <p>
               <b>Status:</b>{" "}
               <span className="font-semibold text-yellow-300">
                 {order.orderStatus}
               </span>
             </p>
+
             <p>
               <b>Payment:</b>{" "}
-              <span className={order.paymentStatus === "PAID" ? "text-green-400" : "text-yellow-400"}>
+              <span
+                className={
+                  order.paymentStatus === "PAID"
+                    ? "text-emerald-400 font-semibold"
+                    : "text-yellow-400 font-semibold"
+                }
+              >
                 {order.paymentStatus}
               </span>
             </p>
@@ -161,34 +190,48 @@ export default function SellerDashboard() {
             <div className="mt-4 flex gap-3">
               {order.orderStatus === "PLACED" && (
                 <>
-                  <button onClick={() => approveReject(order._id, "APPROVE")} className="bg-green-600 px-4 py-2 rounded">
+                  <button
+                    disabled={loading}
+                    onClick={() => approveReject(order._id, "APPROVE")}
+                    className="bg-emerald-600 px-4 py-2 rounded hover:bg-emerald-700 transition"
+                  >
                     Approve
                   </button>
-                  <button onClick={() => approveReject(order._id, "REJECT")} className="bg-red-600 px-4 py-2 rounded">
+                  <button
+                    disabled={loading}
+                    onClick={() => approveReject(order._id, "REJECT")}
+                    className="bg-red-600 px-4 py-2 rounded hover:bg-red-700 transition"
+                  >
                     Reject
                   </button>
                 </>
               )}
 
-              {order.orderStatus === "APPROVED" && order.paymentStatus === "PAID" && (
-                <button onClick={() => markShipped(order._id)} className="bg-blue-600 px-4 py-2 rounded">
-                  Mark Shipped
-                </button>
-              )}
+              {order.orderStatus === "APPROVED" &&
+                order.paymentStatus === "PAID" && (
+                  <button
+                    disabled={loading}
+                    onClick={() => markShipped(order._id)}
+                    className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 transition"
+                  >
+                    Mark Shipped
+                  </button>
+                )}
             </div>
 
             {order.orderStatus === "COMPLETED" && (
-              <div className="mt-4 text-emerald-300 font-bold text-lg">
+              <div className="mt-4 text-emerald-300 font-bold">
                 ✔ Order Completed Successfully
               </div>
             )}
 
+            {/* 🔥 FIXED CANCELLED MESSAGE */}
             {order.orderStatus === "CANCELLED" && (
-              <div className="mt-4 text-red-300 font-bold text-lg">
-                ❌ Order Rejected
+              <div className="mt-4 text-red-300 font-bold">
+                ❌ Cancelled by {order.cancelledBy || "ADMIN"}
               </div>
             )}
-          </div>
+          </motion.div>
         );
       })}
     </div>

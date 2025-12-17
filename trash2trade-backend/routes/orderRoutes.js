@@ -61,6 +61,28 @@ router.post("/", protect, async (req, res) => {
 });
 
 /* ===============================
+   BUYER → GET MY ORDERS ✅
+================================ */
+router.get("/my-buys", protect, async (req, res) => {
+  const orders = await Order.find({ buyer: req.user._id })
+    .populate("material")
+    .populate("seller", "companyName email");
+
+  res.json(orders);
+});
+
+/* ===============================
+   SELLER → GET MY SALES ✅
+================================ */
+router.get("/my-sells", protect, async (req, res) => {
+  const orders = await Order.find({ seller: req.user._id })
+    .populate("material")
+    .populate("buyer", "companyName email");
+
+  res.json(orders);
+});
+
+/* ===============================
    SELLER APPROVE / REJECT
 ================================ */
 router.put("/:id/approve", protect, async (req, res) => {
@@ -92,10 +114,12 @@ router.put("/:id/approve", protect, async (req, res) => {
 
     if (action === "REJECT") {
       order.orderStatus = "CANCELLED";
+      order.cancelledBy = "SELLER";
+      order.cancelledAt = new Date();
 
       await sendEmail(
         order.buyer.email,
-        "Order Rejected",
+        "Order Rejected by Seller",
         orderRejectedEmail(order.material.name)
       );
     }
@@ -109,7 +133,7 @@ router.put("/:id/approve", protect, async (req, res) => {
 });
 
 /* ===============================
-   SELLER SHIP (ONLY AFTER PAYMENT)
+   SELLER SHIP (AFTER PAYMENT)
 ================================ */
 router.put("/:id/pickup", protect, async (req, res) => {
   try {
@@ -176,23 +200,58 @@ router.put("/:id/complete", protect, async (req, res) => {
 });
 
 /* ===============================
-   GET SELLER ORDERS
+   ADMIN → GET ALL ORDERS
 ================================ */
-router.get("/my-sells", protect, async (req, res) => {
-  const orders = await Order.find({ seller: req.user._id })
-    .populate("material")
-    .populate("buyer", "companyName email");
+router.get("/admin/all", protect, async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Admin access only" });
+  }
+
+  const orders = await Order.find()
+    .populate("buyer", "companyName email")
+    .populate("seller", "companyName email")
+    .populate("material");
+
   res.json(orders);
 });
 
 /* ===============================
-   GET BUYER ORDERS
+   ADMIN → CANCEL ANY ORDER
 ================================ */
-router.get("/my-buys", protect, async (req, res) => {
-  const orders = await Order.find({ buyer: req.user._id })
-    .populate("material")
-    .populate("seller", "companyName email");
-  res.json(orders);
+router.put("/admin/:id/cancel", protect, async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Admin access only" });
+  }
+
+  const order = await Order.findById(req.params.id)
+    .populate("buyer")
+    .populate("seller")
+    .populate("material");
+
+  if (!order) return res.status(404).json({ message: "Order not found" });
+
+  if (["COMPLETED", "CANCELLED"].includes(order.orderStatus)) {
+    return res.status(400).json({ message: "Order already closed" });
+  }
+
+  order.orderStatus = "CANCELLED";
+  order.cancelledBy = "ADMIN";
+  order.cancelledAt = new Date();
+  await order.save();
+
+  await sendEmail(
+    order.buyer.email,
+    "Order Cancelled by Admin",
+    `<p>Your order for <b>${order.material.name}</b> was cancelled by Admin.</p>`
+  );
+
+  await sendEmail(
+    order.seller.email,
+    "Order Cancelled by Admin",
+    `<p>An order for <b>${order.material.name}</b> was cancelled by Admin.</p>`
+  );
+
+  res.json(order);
 });
 
 export default router;

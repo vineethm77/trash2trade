@@ -1,8 +1,12 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
 import { createPaymentOrder, verifyPayment } from "../services/paymentService";
 import { loadRazorpay } from "../utils/loadRazorpay";
 
 const PayButton = ({ orderId }) => {
   const token = localStorage.getItem("token");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handlePayment = async () => {
     if (!token) {
@@ -10,22 +14,26 @@ const PayButton = ({ orderId }) => {
       return;
     }
 
+    setError("");
+    setLoading(true);
+
     // 1️⃣ Load Razorpay SDK
     const loaded = await loadRazorpay();
     if (!loaded) {
-      alert("Razorpay SDK failed to load");
+      setError("Razorpay SDK failed to load");
+      setLoading(false);
       return;
     }
 
     try {
-      // 2️⃣ Create Razorpay order from backend
+      // 2️⃣ Create Razorpay order
       const { razorpayOrderId, amount, key } =
         await createPaymentOrder(orderId, token);
 
-      // 3️⃣ Razorpay checkout options
+      // 3️⃣ Razorpay options
       const options = {
         key,
-        amount, // already in paise from backend
+        amount,
         currency: "INR",
         name: "Trash2Trade",
         description: "Material Purchase",
@@ -33,7 +41,6 @@ const PayButton = ({ orderId }) => {
 
         handler: async (response) => {
           try {
-            // 4️⃣ Verify payment in backend
             await verifyPayment(
               {
                 orderId,
@@ -48,7 +55,7 @@ const PayButton = ({ orderId }) => {
             window.location.reload();
           } catch (err) {
             console.error(err);
-            alert("Payment verification failed");
+            setError("Payment verification failed");
           }
         },
 
@@ -57,7 +64,7 @@ const PayButton = ({ orderId }) => {
         },
 
         theme: {
-          color: "#0A65CC",
+          color: "#10b981",
         },
       };
 
@@ -65,17 +72,32 @@ const PayButton = ({ orderId }) => {
       rzp.open();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || "Payment failed");
+      setError(err.response?.data?.message || "Payment failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <button
-      onClick={handlePayment}
-      className="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-    >
-      Pay Now
-    </button>
+    <div className="mt-3">
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        disabled={loading}
+        onClick={handlePayment}
+        className={`px-5 py-2 rounded font-semibold text-white transition
+          ${loading ? "bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}
+        `}
+      >
+        {loading ? "Processing..." : "Pay Now"}
+      </motion.button>
+
+      {error && (
+        <p className="mt-2 text-sm text-red-400 font-medium">
+          {error}
+        </p>
+      )}
+    </div>
   );
 };
 

@@ -21,14 +21,15 @@ export default function Login() {
 
     try {
       const res = await axios.post("/auth/login", form);
-
       const { user, token } = res.data;
 
       // Save to context
       login(user, token);
 
-      // 🔥 ROLE-BASED REDIRECT
-      if (user.role === "buyer") {
+      // ✅ ROLE-BASED REDIRECT (FIXED)
+      if (user.role === "admin") {
+        navigate("/admin/dashboard");
+      } else if (user.role === "buyer") {
         navigate("/buyer/dashboard");
       } else if (user.role === "seller") {
         navigate("/seller/dashboard");
@@ -66,7 +67,7 @@ export default function Login() {
           onChange={handleChange}
         />
 
-        <button className="w-full bg-emerald-500 py-2 rounded-lg">
+        <button className="w-full bg-emerald-500 py-2 rounded-lg hover:bg-emerald-600 transition">
           Login
         </button>
       </form>

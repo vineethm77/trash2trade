@@ -51,6 +51,12 @@ const orderSchema = new mongoose.Schema(
       default: "PENDING",
     },
 
+    // 🔥 WHO CANCELLED (NEW)
+    cancelledBy: {
+      type: String,
+      enum: ["ADMIN", "SELLER", "BUYER"],
+    },
+
     // 🔥 RAZORPAY DETAILS
     paymentInfo: {
       razorpayOrderId: String,
@@ -61,6 +67,7 @@ const orderSchema = new mongoose.Schema(
     // Timestamps for workflow
     approvedAt: Date,
     completedAt: Date,
+    cancelledAt: Date, // 🔥 NEW
   },
   { timestamps: true }
 );

@@ -7,16 +7,23 @@ const userSchema = new mongoose.Schema(
     companyName: { type: String },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+
     role: {
       type: String,
       enum: ["buyer", "seller", "admin"],
       default: "buyer",
     },
+
+    // 🔒 ADMIN CONTROL (BLOCK / UNBLOCK)
+    isBlocked: {
+      type: Boolean,
+      default: false, // false = active, true = blocked
+    },
   },
   { timestamps: true }
 );
 
-// BCrypt compare function
+// 🔐 Password compare method
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

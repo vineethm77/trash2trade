@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-// Protect routes (JWT)
+// ===============================
+// 🔐 PROTECT ROUTES (JWT)
+// ===============================
 export const protect = async (req, res, next) => {
   let token;
 
@@ -14,10 +16,18 @@ export const protect = async (req, res, next) => {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // 🔥 Fetch full user (role needed)
+      // 🔥 Fetch full user (role + block status needed)
       const user = await User.findById(decoded.id).select("-password");
+
       if (!user) {
         return res.status(401).json({ message: "User not found" });
+      }
+
+      // 🚫 BLOCKED USER CHECK (IMPORTANT)
+      if (user.isBlocked) {
+        return res
+          .status(403)
+          .json({ message: "Your account has been blocked by admin" });
       }
 
       req.user = user;
@@ -30,7 +40,9 @@ export const protect = async (req, res, next) => {
   }
 };
 
-// 🔥 Role-based access
+// ===============================
+// 🔥 ROLE-BASED ACCESS
+// ===============================
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {

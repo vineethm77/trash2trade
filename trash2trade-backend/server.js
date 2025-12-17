@@ -10,6 +10,7 @@ import materialRoutes from "./routes/materialRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js"; // ✅ RAZORPAY
 import statsRoutes from "./routes/statsRoutes.js";
+import userRoutes from "./routes/userRoutes.js"; // ✅ ADMIN USERS
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use("/api/materials", materialRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes); // ✅ PAYMENT ROUTES
 app.use("/api/stats", statsRoutes);
+app.use("/api/users", userRoutes); // ✅ ADMIN USER ROUTES
 
 // --------------------
 // SMTP TEST ROUTE

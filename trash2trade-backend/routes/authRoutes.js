@@ -36,8 +36,6 @@ router.post("/register", async (req, res) => {
       role: role || "buyer",
     });
 
-    console.log("Sending welcome email to:", user.email);
-
     // ✅ SEND WELCOME EMAIL
     await sendEmail(
       user.email,
@@ -59,25 +57,33 @@ router.post("/register", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: err.message });
   }
 });
 
 // --------------------
-// LOGIN
+// LOGIN (BLOCK CHECK ADDED ✅)
 // --------------------
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user)
+    if (!user) {
       return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    // 🚫 BLOCKED USER CHECK
+    if (user.isBlocked) {
+      return res
+        .status(403)
+        .json({ message: "Your account has been blocked by admin" });
+    }
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match)
+    if (!match) {
       return res.status(400).json({ message: "Invalid email or password" });
+    }
 
     const token = generateToken(user._id, user.role);
 
